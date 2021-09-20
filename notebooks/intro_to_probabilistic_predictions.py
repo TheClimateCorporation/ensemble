@@ -1,23 +1,49 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # The value of probabilistic predictions: Demonstrated using CRPS-Net
+# # Complete forecasts (predictions) demonstrated using CRPS-Net 
 # 
-# ## Why bother with probabilistic predictions? 
-# 
-# Probabilistic predictions are useful to anyone who wants to understand the range of possible outcomes for predictions made by a given modeling system. In other words, they are useful to anyone who is interested in being honest about the uncertainty in the predictions you are making. Properly representing uncertainty leads to better decision making. For example, imagine you are a farmer and you know that you have a hard time working in your field due to mud if it rains more than 2 inches in 24 hours. If you were to use a deterministic forecast (single predicted value) to decide if you could work in your fields two days from now and the forecast estimated only 1.4 inches to fall you might think you were good to go. However, what if instead of a forecast for 1.4 inches of rainfall, the forecasting system was able to tell you 1.4 inches with a 60% chance of exceeding 2 inches. All of the sudden the decision is not so cut and dry (bazinga). Now imagine that the forecast for tomorrow gave only a 5% chance of too much rain to work the fields. You might decide to work in the field tomorrow to avoid the chance of delays.
-# 
-# <img src="resources/muddy_field.png" width="500" height="300" align="center">
-# 
-# **Muddy fields can be extremely challenging for growers to work in.**
+# <img src="resources/drake.png" width="700" height="400" align="center"> 
 # 
 # 
-# The value of probabilistic predictions has long been established in the field of [Numerical Weather Prediction (NWP)](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/numerical-weather-prediction) (e.g. [1](https://www.ecmwf.int/sites/default/files/elibrary/2012/14557-ecmwf-ensemble-prediction-system.pdf), [2](https://journals.ametsoc.org/view/journals/mwre/146/5/mwr-d-17-0250.1.xml), [3](https://towardsdatascience.com/probabilistic-predictions-fe04214bde48)). The same principals that make them useful in the weather prediction domain ($i.e.$ weather forecasting) apply to predictions from Machine Learning (hereafter ML) models. [Buizza 2008](https://rmets.onlinelibrary.wiley.com/doi/10.1002/asl.170) states some of these benefits with great brevity and clarity (simply interchange ML-based predictions for weather forecasts to see the broader benefit). They state, "Probabilistic forecasts (predictions) designed to estimate the probability density function of forecast (prediction) states are potentially more valuable than single forecasts (predictions) because (1) they can predict not only the most likely outcome but also the probability of occurrence of extreme and rare events". In other words, a (good) probabilistic prediction reliably represents the true uncertainty of a given forecasting system. In the weather forecasting domain, sources of uncertainty include not knowing the true state of the atmosphere before integrating (forward in time) the physical equations of the atmosphere (also imperfect) to make future predictions ([many more details here](https://www.ecmwf.int/sites/default/files/elibrary/2012/14557-ecmwf-ensemble-prediction-system.pdf)). In Machine learning, sources of uncertainty may include flawed or incomplete features to property map the feature space to the target variable, numerical roundoff,  bias-variance tradeoffs, not enough data, $etc$... 
+# ## Why bother with estimating prediction uncertainty?  
 # 
-# CRPS-Net can help mitigate issues inherit to decision making that relies on deterministic predictions by reliably representing the $range$ of possible outcomes ($y_{pred}$ as a probability density function) rather than a single point estimate. What are the downsides? None! Well, close anyways. The most common opposition to probabilistic predictions are that they are 1) Hard to interpret and 2) computationally expensive. CRPS-Net and Ensemble, both of which will be demonstrated by this notebook, help to overcome these barriers. 
+#   
 # 
+# Properly accounting for uncertainty can lead to better decision making. For example, imagine you are a grower and you know that you have a hard time working in your field due to mud if it rains more than 2 inches in 24 hours. If you were to use a deterministic forecast (single predicted value, like what you probably see on your phone's default weather app) to figure out if you will be able to work in your fields tomorrow and the forecast is calling for 1.4 inches of rain you might think you were good to go. However, in the back of your head you know that weather forecasts can be wrong (as an atmospheric scientist I am sorry about this, there are lots of reasons for this that I do not have time to get into right now. If you are curious, [here](https://www.ecmwf.int/en/research/modelling-and-prediction/quantifying-forecast-uncertainty) is a good resource to learn more about this). Often times people do some kind of three dimensional chess in their heads and think things like, "O.K. the weather app says it is going to rain 1.4 inches, historically I know that could mean anywhere between 0.1 and 3 inches of rain might fall." Wouldn't it be handy if the forecasting system was transparent about how confident it was in its own prediction and did this for you? What if instead of a forecast for 1.4 inches of rainfall, the forecasting system was able to tell you 1.4 inches with a 60% chance of exceeding 2 inches. With this forecast, making plans to work in the field tomorrow suddenly seems less full proof, *i.e.* the decision is not so cut and dry (bazinga). Now imagine that the forecast two days from now gave only a 5% chance of more than two inches of rain. If you had confidence in the forecasting system you would probably decide to work in the field the day the chance of mud was lower. If you were to play out this scenario hundreds of times and the forecast probabilities were reliable (*see note on reliability below) (meaning events that were given some X% chance to occur actually occurred X% of those times, for all percentages), the grower that made decisions using this system would save lots of time. 
+# 
+#   
+# 
+# <img src="resources/muddy_field.png" width="500" height="300" align="center"> 
+# 
+#   
+# 
+# <center><b>Muddy fields can be extremely challenging for growers to work in.</b><center> 
+# 
+# <br> 
+# 
+#   
+# 
+# The value of these kinds of predictions has long been established in the field of [Numerical Weather Prediction (NWP)](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/numerical-weather-prediction) (e.g. [1](https://www.ecmwf.int/sites/default/files/elibrary/2012/14557-ecmwf-ensemble-prediction-system.pdf), [2](https://journals.ametsoc.org/view/journals/mwre/146/5/mwr-d-17-0250.1.xml), [3](https://towardsdatascience.com/probabilistic-predictions-fe04214bde48)). The same principals that make them useful in the weather prediction domain ($i.e.$ weather forecasting) apply to predictions made using Machine Learning (hereafter ML) models. [Buizza 2008](https://rmets.onlinelibrary.wiley.com/doi/10.1002/asl.170) states some of these benefits with great brevity and clarity (simply interchange ML-based predictions for weather forecasts to see the broader benefit). They state, "Probabilistic forecasts (predictions) designed to estimate the probability density function of forecast (prediction) states are potentially more valuable than single forecasts (predictions) because (1) they can predict not only the most likely outcome but also the probability of occurrence of extreme and rare events". In other words, a (good) probabilistic prediction reliably represents the true uncertainty of a given forecasting system, and transparently conveys the whole range of possible outcomes (I like to also call this a *complete forecast*). In the weather forecasting domain, sources of uncertainty include not knowing the true state of the atmosphere before integrating (forward in time) the so-called [physical equations](https://en.wikipedia.org/wiki/Primitive_equations) of the atmosphere (also imperfect) to make future predictions ([many more details here](https://www.ecmwf.int/sites/default/files/elibrary/2012/14557-ecmwf-ensemble-prediction-system.pdf)). In Machine learning, sources of uncertainty may include flawed or incomplete features to properly map the feature space to the target variable, numerical roundoff, bias-variance tradeoffs, not enough data, not converging on the optimal loss function minima while training, $etc$...  
+# 
+# 
+# Luckily CRPS-Net can help! CRPS-Net makes it easy to make predictions that reliably portray the $range$ of possible outcomes ($y_{pred}$ as a probability density function) rather than a single point estimate. What are the downsides? None! Well, close anyways. The most common opposition to probabilistic predictions are that they are 1) Hard to interpret and 2) computationally expensive. CRPS-Net and Ensemble, both of which will be demonstrated by this notebook, help to overcome these barriers. 
+#     
+# ***Quick Note on reliability:** Probability forecasts are considered reliable when, evaluated over many cases, forecast probability (p) matches the observed relative frequency. What? This means a forecasting system is reliable if it rains 10% of the time a forecasting system calls for a 10% chance of rain. Somewhat annoyingly this means you need to wait around a while before saying, "the forecast was wrong!". Also somewhat annoyingly, this means you do not get to say, "the forecast was wrong" if a 51% chance of rain was predicted and no rain occurred. Probabilities are not winner takes all elections. If it rained 51/100 times a 51% chance of rain was given, the forecast was perfect! This is often measured using a [verification rank histogram](https://journals.ametsoc.org/view/journals/mwre/129/3/1520-0493_2001_129_0550_iorhfv_2.0.co_2.xml).
+# 
+# 
+# **Fun aside:** Usually when you see "% chance of rain" from some forecasting system it is referring to 0.01 inches of rain occurring in some time period. It has nothing to do with precipitation quantity. A 90% chance of rain does not mean more rain than 50%, just a higher chance of 0.01 inches. 
 
-# In[1]:
+# ## Getting started with CRPS-net
+#     
+# The rest of this notebook is dedicated to demonstrating what CRPS-Net is and how it can be usefull for making complete non-parametric predictions. Following the code requires only a basic understanding of python, neural networks, and TensorFlow.
+# 
+# ### Python Prerequisites
+# - ensemble
+# - tensorflow
+# - sklearn
+
+# In[8]:
 
 
 # Load standard ML resources from sklearn
@@ -40,18 +66,16 @@ import sys
 import warnings
 
 # Import functions specifically cooked up for this notebook
-from tcc_ensemble.demo_data import create_point_gamma_data
-
-# TODO: This will be importing our Github hosted package after showing 
-# TODO: how to install at the command line
-from tcc_ensemble.crps_net import crps_sample_score
+import sys
+from ensemble.demo_data import create_point_gamma_data
+from ensemble.crps_net import crps_sample_score
 
 
-# ### Create synthetic data
+# ### Create synthetic data that would be hard to make useful predictions of using standard regression techniques
 # 
-# These data are a combination of a point-mass distribution, stuck at zero, and a gamma function increasing with arbitrary feature X. The different branches of these target data present a challenge to make a meaningful prediction using many standard loss functions such as mean absolute error or mean squared error. 
+# These data are a combination of a point-mass distribution stuck at zero and a gamma function increasing with arbitrary feature X. The different branches of these target data present a challenge to make a meaningful prediction using many standard loss functions such as mean absolute error or mean squared error. 
 
-# In[2]:
+# In[9]:
 
 
 X, y = create_point_gamma_data(
@@ -63,7 +87,7 @@ X, y = create_point_gamma_data(
 )
 
 
-# In[3]:
+# In[10]:
 
 
 f=plt.figure(dpi=150)
@@ -81,7 +105,7 @@ plt.show()
 
 # Lets train a couple of simple neural networks and see which one seems more useful trying to predict y using X. 
 
-# In[4]:
+# In[11]:
 
 
 def build_simple_network(
@@ -147,7 +171,7 @@ def build_simple_network(
     return model
 
 
-# In[5]:
+# In[12]:
 
 
 # Split up the data for training and "testing"
@@ -159,7 +183,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # ### Train the simple models 
 # Train a model with mean absolute error as a loss function and crps_sample_score as a loss function. We will go into the details of the CRPS loss function in a bit. 
 
-# In[6]:
+# In[ ]:
 
 
 tf.keras.backend.clear_session()
@@ -223,7 +247,7 @@ crps_net.fit(
 # 
 # Since it is hard to show a scatter plot of multiple predictions vs. what occurs, I will show predictions across the range of X_test (more rigorous evaluations of these predictions will be made later). Before digging into the predictions too much, I would like to note that CRPS-Net took ~3ms per step vs. the MAE model's ~2ms. This is slower for sure, but not much slower. It will be up to you to decide if the rewards are worth it!  
 
-# In[7]:
+# In[14]:
 
 
 # Make predictions across the range of the feature X
@@ -234,7 +258,7 @@ mae_pred = mae_model.predict(x_span)
 crps_net_pred = crps_net.predict(x_span)
 
 
-# In[8]:
+# In[15]:
 
 
 # NOTE: the predictions of CRPS-net are a bit funky 
@@ -244,7 +268,7 @@ crps_net_pred = crps_net.predict(x_span)
 crps_net_pred.shape
 
 
-# In[9]:
+# In[16]:
 
 
 fig = plt.figure(dpi=160)
@@ -299,7 +323,7 @@ plt.show()
 # <img src="resources/CRPS_det.png" width="500" height="300" align="center">
 # <img src="resources/comparison.png" width="500" height="300" align="center">
 # 
-# The final figure compares the CRPS (the same units as the predicted variable) for the point prediction and the probabilistic prediction shown as a CDF. For this very professional but still leaves something to be desired sketch, it is not clear which area is smaller, but you get the idea! This shows how the CRPS is useful for making direct comparisons of point predictions and probabilistic predictions. For a very thorough overview of CRPS, take a look at [this paper](https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf). 
+# The bottom of the above figure compares the CRPS (the same units as the predicted variable) for the point prediction and the probabilistic prediction shown as a CDF. For this very professional but still leaves something to be desired sketch, it is not clear which area is smaller, but you get the idea! This shows how the CRPS is useful for making direct comparisons of point predictions and probabilistic predictions. For a very thorough overview of CRPS, take a look at [this paper](https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf). 
 # 
 
 # ### Note on Mixture Density Networks
@@ -422,7 +446,7 @@ stats.ttest_rel(mae_subset.ravel(), crps_subset.ravel())
 # In[29]:
 
 
-from tcc_ensemble.ensemble_tools import probability_from_members, prob_between_values
+from ensemble.ensemble_tools import probability_from_members, prob_between_values
 
 
 # In[30]:
@@ -601,7 +625,7 @@ print("MAE model Brier Score", mae_bs[(X_test>7).ravel()].mean())
 
 # ### CRPS-Net helps you better predict the probability of events
 # 
-# Above, we see that the CRPS-Net Brier score is ~0.21 while the MAE model Brier score is ~0.58, clearly showing that CRPS-Net is much better at estimating the probability of Y > 750 given X > 7. This would hold for other events, since CRPS-Net is capable of nuanced probabilities, not just 0 and 1 like deterministic predictions. 
+# Above, we see that the CRPS-Net Brier score is ~0.21 while the MAE model Brier score is ~0.58, clearly showing that CRPS-Net is much better at estimating the probability of Y > 750 given X > 7 (note, your values may be a bit different due to a slightly different dataset returned by create_point_gamma_data(), different version of TF, $etc.$). This would hold for other events, since CRPS-Net is capable of nuanced probabilities, not just 0 and 1 like deterministic predictions. 
 
 # ### CRPS-Net can have utility for predictions that extrapolate beyond the training data
 # 
@@ -782,16 +806,5 @@ plt.show()
 
 # ## Wrap up
 # 
-# Hopefully this notebook has demonstrated some of the value of probabilistic predictions and how CRPS-Net (using crps_sample_scale as your loss function and multiple outputs in the final layer of your neural network) can help you easily make these kinds of predictions! Don't forget, the number of neurons in your output layer (the so-called pseudo ensemble members) is a new hyperparameter! Make sure to tune this for your modeling problem. 
+# Hopefully this notebook has demonstrated some of the value of probabilistic predictions and how CRPS-Net (using crps_sample_score() as your loss function and multiple outputs in the final layer of your neural network) can help you easily make these kinds of predictions! Don't forget, the number of neurons in your output layer (the so-called pseudo ensemble members) is a new hyperparameter! Make sure to tune this for your modeling problem. 
 # 
-
-# # Possible TODOS: 
-# 
-# - Show CRPS on test set vs. the number of pseudo ensemble members used in the model to demonstrate the importance of tuning this new hyperparameter
-# - Value scores and contingency table for an event, ROC curves, etc., a walkthrough of the value of probabistic predictions.
-
-# In[2]:
-
-
-get_ipython().system('sleep 1; jupyter nbconvert --to html intro_to_probabilistic_predictions.ipynb --output intro_to_probabilistic_predictions')
-

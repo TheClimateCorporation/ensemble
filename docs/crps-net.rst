@@ -44,10 +44,9 @@ save lots of time.
 .. image:: resources/muddy_field.png
     :width: 800
     :align: center
+    :target: https://www.geograph.org.uk/photo/2132503
 
-
-Muddy fields can be extremely challenging for growers to work in.
-
+Muddy fields can be extremely challenging for growers to work in. `Photo credit. <https://www.geograph.org.uk/photo/2132503>`__
 
 
 The value of these kinds of predictions has long been established in the
@@ -150,7 +149,6 @@ Python Prerequisites
     
     # Import functions specifically cooked up for this notebook
     import sys
-    sys.path.insert(0, "/Users/steven.brey/Google Drive/projects/ensemble")
     from ensemble.demo_data import create_point_gamma_data
     
     # TODO: This will be importing our Github hosted package after showing 
@@ -911,7 +909,7 @@ probability and :math:`O_t` is whether the event occured (1) or not (0).
 
 .. code-block:: python
 
-    # import some handy scoring tools from another TCC project! 
+    # import some handy scoring tools from another TCC repo! 
     from properscoring import threshold_brier_score
 
 .. code-block:: python

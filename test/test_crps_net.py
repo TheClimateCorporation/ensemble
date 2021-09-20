@@ -7,7 +7,7 @@ Authors: Steven Brey
 import numpy as np
 import pytest
 import sys
-from tcc_ensemble.crps_net import crps_sample_score
+from ensemble.crps_net import crps_sample_score
 
 # This code is designed to work whether or not tensorflow is installed.
 # However, this changes what tests can be run when package builds.

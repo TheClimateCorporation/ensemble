@@ -39,4 +39,5 @@ jobs:
       run: |
         cd ..
         echo $(pwd)
+        echo $(ls)
         pytest

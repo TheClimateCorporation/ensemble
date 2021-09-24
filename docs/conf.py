@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 # -- Project information -----------------------------------------------------
 
 project = "ensemble"
-copyright = "2020, TCC Weather Science"
+copyright = "2020, Steven Brey"
 author = "steven.brey@climate.com"
 
 # The full version, including alpha/beta/rc tags

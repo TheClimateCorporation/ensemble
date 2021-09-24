@@ -17,7 +17,7 @@ jobs:
           python -m pip install sly coverage regex pytest
       - name: Test with coverage/pytest
         run: |
-          coverage run -m pytest tests
+          coverage run -m pytest test
       - name: Coveralls
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

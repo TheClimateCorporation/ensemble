@@ -29,7 +29,7 @@ setup(
     version=get_version(),
     description=get_description(),
     install_requires=install_requires(),
-    author="Steven Brey, Hunter Merrill, Tony Eckel, TCC",
+    author="The Climate Corporation, Steven Brey, Hunter Merrill, Tony Eckel",
     author_email="steven.brey@climate.com",
     include_package_data=True,
     packages=find_packages(exclude=("test",)),

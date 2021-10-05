@@ -98,61 +98,107 @@ Training a neural network with crps_sample_score_loss (so-called CRPS-Net)
 
 .. code-block:: python
 
-  from sklearn.datasets import make_regression
-  from tcc_ensemble.crps_net import crps_sample_score
+  import matplotlib.pyplot as plt
+  import numpy as np
   import tensorflow as tf
   import tensorflow.keras as K
+  from sklearn.datasets import make_regression
+  from tcc_ensemble.crps_net import crps_sample_score
 
-  # cook up some regression data
-  X, y = make_regression(n_features=4, n_informative=2,
-                         random_state=0, shuffle=False)
+  # Create 100 samples of random, regression-based data of features (X) and target (y) values
+  n_samples = 100
+  n_features = 4
+  X, y = make_regression(n_samples=n_samples,
+                         n_features=n_features,
+                         n_informative=2,
+                         random_state=0,
+                         shuffle=False)
 
-  inputs = K.layers.Input(shape=(X.shape[1],))
+  # Prepare the featureset for tensorflow
+  inputs = K.layers.Input(shape=(n_features,))
 
   # Create the hidden layers
-  x = K.layers.Dense(100, activation=tf.nn.leaky_relu)(inputs)
+  x = K.layers.Dense(32, activation=tf.nn.leaky_relu)(inputs)
   x = K.layers.Dropout(0.1)(x)
-  x = K.layers.Dense(100, activation=tf.nn.leaky_relu)(x)
+  x = K.layers.Dense(16, activation=tf.nn.leaky_relu)(x)
   x = K.layers.Dropout(0.1)(x)
 
-  # Create the distribution parameters---
-  outputs = K.layers.Dense(51, name="ensemble_members")(x)
+  # Create the distribution parameters for an 30-member ensemble
+  # Note:  Rule-of-thumb in statistics is that 30 is the minimum
+  # number of samples required to reliably capture and represent
+  # a distribution.
+  n_ensemble_members = 30
+  outputs = K.layers.Dense(n_ensemble_members, name="ensemble_members")(x)
+  model_ens30 = K.Model(inputs=inputs, outputs=outputs)
 
-  model = K.Model(inputs=inputs, outputs=outputs)
-
-  # Create the distribution parameters---
-  outputs = K.layers.Dense(11, name="ensemble_members")(x)
-  model = K.Model(inputs=inputs, outputs=outputs)
-
-  # Compile and train
-  # Obviously, in real life, set aside some validation and
-  # test data... 
+  # Compile and Train the ML model, named model_ens30
+  # Note: In real life, set aside some validation data from the training data
   opt = tf.keras.optimizers.Adam(learning_rate=0.001)
-  model.compile(loss=crps_sample_score, optimizer=opt)
-
-  # Train it!
-  _ = model.fit(
-      x=X,
-      y=y, epochs=100,
-      batch_size=16,
-      verbose=0
-  )
+  model_ens30.compile(loss=crps_sample_score, optimizer=opt)
+  model_ens30.fit(x=X,
+                  y=y,
+                  epochs=100,
+                  batch_size=16,
+                  verbose=0)
 
   # Make a prediction to show the nature/format of the output
-  print("X[0]=", model.predict(X)[0])
-  print("y[0]=" ,y[0])
+  # Note:  This example uses training data, whereas in real life model_ens30
+  #        would be applied to a set of the 4 features NOT in the training data
+  example_index = 79  # Arbitrary set of data within the training set
+  ens_pred_example = model_ens30.predict(X)[example_index]
+  roundoff = 2
+  ens_mean = round(np.mean(ens_pred_example), roundoff)
+  ens_spread = round(np.std(ens_pred_example), roundoff)
+  print(f"\nGiven set of feature values  X = {X[example_index]}",
+        f"\nEnsemble prediction = {np.round(ens_pred_example, roundoff)}",
+        f"\n      Ensemble mean = {ens_mean}",
+        f"\n     Ensemble spread = {ens_spread}",
+        f"\nTarget value = {np.round(y[example_index], roundoff)}")
 
-  plt.hist(model.predict(X)[1], label="ensemble prediction")
-  plt.axvline(x=model.predict(X)[1].mean(), c="C1", label="prediction mean")
-  plt.axvline(x=y[1], c="k", label="target value")
-  plt.title("Example of CRPS-net prediction")
-  plt.legend()
+  # Plot the example prediction
+  hist_y, hist_x, _ = plt.hist(model_ens30.predict(X)[example_index], label="Ensemble Prediction")
+  plt.axvline(x=model_ens30.predict(X)[example_index].mean(),
+              c="C1",
+              linewidth=3,
+              label="Ensemble Mean")
+  plt.axvline(x=model_ens30.predict(X)[example_index].mean() + 3 * ens_spread,
+              c="C1",
+              linestyle='dashed',
+              linewidth=2,
+              label="Ensemble +/- 3 sigma")
+  plt.axvline(x=model_ens30.predict(X)[example_index].mean() - 3 * ens_spread,
+              c="C1",
+              linestyle='dashed',
+              linewidth=2)
+  plt.axvline(x=y[example_index],
+              c="k",
+              linewidth=3,
+              label="Actual Target Value")
+
+  plt.title("Example CRPS-net Prediction", fontsize=14, fontweight='bold')
+  plt.xlabel("Potential Target Value", fontsize=12, fontweight='bold')
+  plt.ylabel("Number of Ensemble Members", fontsize=12, fontweight='bold')
+  plt.yticks(np.arange(0, max(hist_y)+1, 1))
+  legend = plt.legend(frameon = 1)
+  frame = legend.get_frame()
+  frame.set_alpha(None)
+  frame.set_facecolor('lightgrey')
+
+  plt.savefig('example_CRPS-net_prediction.png')
 
 .. parsed-literal::
 
-  X[0]= [55.81589  46.660816 47.57 55.332935 45.48425  51.072544 54.814026
-  51.43248  48.93596  47.72373  48.683598]
-  y[0]= 49.822907447421905
+  Given set of feature values  X = [-0.04217145 -0.28688719 -0.0616264  -0.10730528] 
+
+  Ensemble prediction = [-15.46 -11.96 -17.33 -14.83 -13.15 -14.76 -17.22 -18.4  -13.89 -15.8
+ -17.83 -18.8  -19.39 -18.11 -21.02 -21.71  -4.98 -14.69 -13.11 -21.4
+ -10.94 -12.6  -12.23 -15.6  -24.99 -14.31 -17.02 -14.38 -14.99 -12.32] 
+
+  Ensemble mean = -15.77 
+
+  Ensemble spread = 3.82
+
+  Target value = -10.67
 
 .. image:: resources/example_crps_net_prediction.png
     :width: 500
